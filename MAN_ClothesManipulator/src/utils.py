@@ -1,10 +1,10 @@
 import pickle
 import numpy as np
 
-with open('../multi_manip/split_index.obj', 'rb') as fp:
+with open('multi_manip/split_index.obj', 'rb') as fp:
     split_index = pickle.load(fp)
     fp.close()
-with open('../multi_manip/cut_index.obj', 'rb') as fp:
+with open('multi_manip/cut_index.obj', 'rb') as fp:
     cut_index = pickle.load(fp)
     fp.close()
 

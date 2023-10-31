@@ -11,6 +11,10 @@ from utils import listify_manip
 from numpy.linalg import norm
 from tqdm import tqdm
 import time
+from torch.utils.data import Dataset
+import torch
+from torch.nn.utils.rnn import pad_sequence
+
 
 
 def normalize(dis_feat, normalization):
@@ -19,12 +23,27 @@ def normalize(dis_feat, normalization):
         return dis_feat_normalized
     return dis_feat
 
+def pad_collate(batch):
+    (xx, yy, zz) = zip(*batch)
+    # x_lens = [len(x) for x in xx]
+    # y_lens = [len(y) for y in yy]
+    z_lens = [len(z) for z in zz]
 
-class DataSupplier:
+    # xx_pad = pad_sequence(xx, batch_first=True, padding_value=0)
+    # yy_pad = pad_sequence(yy, batch_first=True, padding_value=0)
+    xx_batch = torch.stack(xx)
+    yy_batch = torch.stack(yy)
+    zz_pad = pad_sequence(zz, batch_first=True, padding_value=0)
 
-    def __init__(self, file_root, img_root_path, dis_feat_root, mode='train', normalized=False):
+    return xx_batch, yy_batch, zz_pad, z_lens
+
+class SequenceDataset(Dataset):
+
+    def __init__(self, file_root, img_root_path, dis_feat_root, mode='train', normalized=False,
+                 recompute_distances=False, fix_seq_len=None, max_seq_len=8):
         self.mode = mode  # 'train' or 'test'
-
+        self.fix_seq_len = fix_seq_len
+        self.max_seq_len = max_seq_len
         if self.mode == 'train':
             self.data = Data(file_root, img_root_path,
                              transforms.Compose([
@@ -52,22 +71,45 @@ class DataSupplier:
 
         self.dis_feat_file = np.load(dis_feat_root)
 
-        if False:
-            self.distance_dict = self.build_distance_dict(labels)
-            np.save("distance_dict.npy", self.distance_dict)
+        if recompute_distances:
+            self.distance_dict = self.build_distance_dict(self.data.label_data)
+            np.save("distance_dict_new.npy", self.distance_dict)
         else:
-            self.distance_dict = np.load('distance_dict.npy', allow_pickle=True)[None][0]
-        print(len(self.distance_dict))
+            self.distance_dict = np.load('distance_dict_new.npy', allow_pickle=True)[None][0]
+        print('Dataset ready')
+
+    def __len__(self):
+        return 3200 # a random length since our dataset is virtually infinite
+    
+    def __getitem__(self, idx):
+        if self.fix_seq_len:
+            sample_distance = np.random.randint(1, self.fix_seq_len)
+        else:
+            sample_distance = np.random.randint(1, self.max_seq_len+1)
+        q_id, t_id = self.find_couple_fast(sample_distance)
+        q_dis_feat, t_dis_feat = self.get_disentangled_features(q_id, t_id)
+        control, manip_vectors = self.get_manipulation_vectors(q_id, t_id, sample_distance)  # input 151
+        # print(manip_vectors)
+        assert control==True, "manipulation exceeds distance"
+
+        target = torch.reshape(torch.from_numpy(t_dis_feat), (12, 340))
+        query = torch.reshape(torch.from_numpy(q_dis_feat), (12, 340))
+        net_inputs = torch.reshape(torch.from_numpy(manip_vectors), (len(manip_vectors), 151)).float()
+        return target, query, net_inputs
 
     def get_next_pair_sample(self, max_distance_between_pair):
-        #st = time.time()
-        #q, t = self.find_couple(labels, max_distance_between_pair)  # query = start image, target = wanted image
-        #et = time.time()
-        #st_fast = time.time()
         q, t = self.find_couple_fast(max_distance_between_pair)
-        #et_fast = time.time()
-        #print(f'original time: {et - st}, new time: {et_fast - st_fast}, speedup: {(et - st)/(et_fast - st_fast)}')
         return q, t
+    
+    def compare_labels(self, id1, id2):
+        cut_index_np = np.array(cut_index)
+        l1 = np.split(self.data.label_data[id1], cut_index_np[:-1,1])
+        l2 = np.split(self.data.label_data[id2], cut_index_np[:-1,1])
+
+        for q,w in zip(l1,l2):
+            print(q)
+            print(w)
+
     
     def build_distance_dict(self, labels):
         n_labels = labels.shape[0]
@@ -75,19 +117,20 @@ class DataSupplier:
         #distance_matrix = np.ones((n_labels, n_labels), dtype=np.uint8)*-1
         distance_dict = {}
         split_labels = np.split(labels, cut_index_np[:-1,1], axis=1)
+        attribute_signatures = np.stack([np.all(x==0, axis=1) for x in split_labels], axis=1)
+        
         for query_id in tqdm(range(len(labels))):
             query_labels = np.split(labels[query_id], cut_index_np[:-1, 1])
-            #query_labels = [x[query_id] for x in split_labels]
             valid_attributes = np.where([sum(x) for x in query_labels])[0]
             invalid_attributes = np.setdiff1d(range(len(cut_index_np)), valid_attributes)
 
-            valid_ids_mask = np.prod([np.sum(split_labels[x],1) == 0 for x in invalid_attributes], axis=0)
-            #valid_ids = np.where(valid_ids_mask)[0] # ids of garments that share the same types of attributes with the query
-            valid_ids = np.where(np.where(valid_ids_mask)[0] > query_id)[0] # avoid repetitions
+            #valid_ids_mask = np.prod([np.sum(split_labels[x],1) == 0 for x in invalid_attributes], axis=0)# ids of garments that share the same types of attributes with the query
+            valid_ids_mask = np.all(np.logical_not(attribute_signatures ^ attribute_signatures[query_id]),axis=1)
+            valid_ids = np.where(valid_ids_mask)[0]
+            valid_ids = valid_ids[valid_ids > query_id] # avoid repetitions
 
             valid_changes = [np.sum(np.abs(query_labels[x] - split_labels[x]), axis=1)==2 for x in valid_attributes]
             num_changes = np.sum(valid_changes,0)
-            #distance_matrix[query_id,valid_ids] = num_changes[valid_ids]
 
             unique_changes = np.unique(num_changes[valid_ids])
             for uc in unique_changes:
@@ -103,50 +146,11 @@ class DataSupplier:
 
     
     def find_couple_fast(self, distance_between_pair):
-        #num_queries = len(self.distance_dict[distance_between_pair])
         query = np.random.choice(list(self.distance_dict[distance_between_pair].keys()))
-        #num_targets = len(self.distance_dict[distance_between_pair][query])
         target = np.random.choice(self.distance_dict[distance_between_pair][query])
-
-        #query = self.distance_dict[distance_between_pair][query]
-        #target = self.distance_dict[distance_between_pair][query][target_id]
         if np.random.random() > 0.5:
             query, target = target, query # swap query and target randomly
         return query, target
-
-
-    def find_couple(self, labels, max_distance_between_pair):
-        n_labels = labels.shape[0]
-        cut_index_np = np.array(cut_index)
-
-        found_q = -1
-        found_t = -1
-
-        q_indexes = np.arange(n_labels)
-        np.random.shuffle(q_indexes)
-
-        for q_id in q_indexes:
-            t_indexes = np.arange(n_labels)  # [0, 1, ..., n_labels]
-            np.random.shuffle(t_indexes)
-            for t_id in t_indexes:
-                if not np.array_equal(labels[q_id], labels[t_id]):
-                    if not self.too_much_distance(labels[q_id], labels[t_id], cut_index_np, max_distance_between_pair):
-                        found_q = q_id
-                        found_t = t_id
-                        return found_q, found_t  # Contain id of two images with <=N distance
-
-        return found_q, found_t  # return -1, -1
-
-    def too_much_distance(self, q_lbl, t_lbl, cut_index_np, max_distance_between_pair):
-        multi_manip = np.subtract(q_lbl, t_lbl)
-        distance = 0
-        for ci in cut_index_np:
-            if np.any(multi_manip[ci[0]:ci[1]]):  # return false if [0, 0, ..., 0], true if [-1, 0, 1, 0 ..., 0]
-                distance += 1
-        if distance > max_distance_between_pair:
-            return True
-        else:
-            return False
 
     def get_disentangled_features(self, q_id, t_id):
         q_dis_feat = self.dis_feat_file[q_id]

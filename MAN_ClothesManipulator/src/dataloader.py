@@ -4,7 +4,7 @@ import torch.utils.data as data
 import torchvision.transforms as transforms
 from PIL import Image
 
-from MAN_ClothesManipulator.src.utils import get_idx_label
+from utils import get_idx_label
 
 
 class Data(data.Dataset):

@@ -5,9 +5,9 @@
 
 import numpy as np
 import torchvision.transforms as transforms
-import MAN_ClothesManipulator.src.constants as C
-from MAN_ClothesManipulator.src.dataloader import Data
-from MAN_ClothesManipulator.src.utils import cut_index
+import constants as C
+from dataloader import Data
+from utils import cut_index
 from utils import listify_manip
 from numpy.linalg import norm
 
@@ -67,11 +67,7 @@ class OptimizedDataSupplier:
     def get_next_pair_sample(self, distance_between_pair):
         labels = self.data.label_data
         q, t = self.find_couple(labels, distance_between_pair)  # query = start image, target = wanted image
-
-        if q != -1 and t != -1:
-            return True, q, t
-
-        return False, q, t
+        return q, t
 
     def find_couple(self, labels, distance_between_pair):
         n_labels = labels.shape[0]

@@ -3,7 +3,7 @@
 from attr import attrs, attrib, Factory
 from torch import nn
 from torch import optim
-from MAN_ClothesManipulator.ntm.aio import EncapsulatedNTM
+from ntm.aio import EncapsulatedNTM
 
 
 @attrs

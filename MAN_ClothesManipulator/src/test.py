@@ -3,9 +3,9 @@
 import torch
 import matplotlib.pyplot as plt
 
-from MAN_ClothesManipulator.src.data_supplier import DataSupplier
-from MAN_ClothesManipulator.src.optimized_data_supplier import OptimizedDataSupplier
-from MAN_ClothesManipulator.src.task.clothesManipulatorTask import ClothesManipulatorModelTraining, \
+from data_supplier import DataSupplier
+from optimized_data_supplier import OptimizedDataSupplier
+from clothesManipulatorTask import ClothesManipulatorModelTraining, \
     ClothesManipulatroTaskParams
 
 TASKS = {

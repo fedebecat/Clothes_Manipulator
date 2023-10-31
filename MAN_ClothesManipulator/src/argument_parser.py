@@ -10,10 +10,10 @@ def add_base_args(parser):  # common arguments for all CLIs
                         choices=['alexnet', 'resnet'],
                         help='Select pretrained backbone architecture (alexnet or resnet)')
     parser.add_argument('--file_root', type=str,
-                        default='../splits/Shopping100k',
+                        default='splits/Shopping100k',
                         help='Path for pre-processed files')
     parser.add_argument('--img_root', type=str,
-                        default='../Shopping100k/Images',
+                        default='Shopping100k/Images',
                         help='Path for raw images')
     parser.add_argument('--num_threads', type=int,
                         default=16,
@@ -25,10 +25,10 @@ def add_base_args(parser):  # common arguments for all CLIs
                         default=340,
                         help='Dimension of each attribute-specific embedding')
     parser.add_argument('--load_pretrained_extractor', type=str,
-                        default='../models/Shopping100k/extractor_best.pkl',
+                        default='models/Shopping100k/extractor_best.pkl',
                         help='Load pretrained weights of disentangled representation learner')
     parser.add_argument('--load_pretrained_MAN', type=str,
-                        default='../nets/last.pth',
+                        default='nets/last.pth',
                         help='Load pretrained memory augmented network')
     parser.add_argument('--use_cpu', action='store_true',
                         help='Do not use cuda')

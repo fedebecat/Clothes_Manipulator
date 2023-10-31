@@ -8,7 +8,7 @@ from dataloader import Data
 from model import Extractor
 import constants as C
 
-MODE = 'train'  # 'test'
+MODE = 'test'  # 'test'
 
 if not torch.cuda.is_available():
     print('Warning: Using CPU')
@@ -50,8 +50,8 @@ with torch.no_grad():  # say not training but evaluation and sets some values
 dim_chunk = 340  # 340 values for feature
 gallery_feat = np.concatenate(gallery_feat, axis=0).reshape(-1, dim_chunk * len(gallery_data.attr_num))
 
-print("shape of gallery_feat_train: {}".format(len(gallery_feat)))  # test
-np.save("../disentangledFeaturesExtractor/feat_train_senzaNorm.npy", gallery_feat)  # test
-print('Saved indexed features at /feat_train_senzaNorm.npy')  # test
+print(f"shape of gallery_feat_{MODE}: {len(gallery_feat)}")  # test
+np.save(f"../disentangledFeaturesExtractor/feat_{MODE}_senzaNorm.npy", gallery_feat)  # test
+print(f'Saved indexed features at /feat_{MODE}_senzaNorm.npy')  # test
 
 # np.load() for reload

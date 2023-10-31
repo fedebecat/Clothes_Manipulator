@@ -75,7 +75,7 @@ if __name__ == '__main__':
     #     np.save(os.path.join(args.feat_dir, 'gallery_feat.npy'), gallery_feat)
     #     print('Saved indexed features at {dir}/gallery_feat.npy'.format(dir=args.feat_dir))
     # gallery_feat = np.concatenate(gallery_feat, axis=0).reshape(-1, args.dim_chunk * len(gallery_data.attr_num))
-    gallery_feat = np.load('../disentangledFeaturesExtractor/feat_test_senzaNorm.npy')
+    gallery_feat = np.load('disentangledFeaturesExtractor/feat_test_senzaNorm.npy')
 
     # indexing the query
     query_inds = np.loadtxt(os.path.join(file_root, args.query_inds), dtype=int)  # query's single manipulation vector
@@ -117,7 +117,16 @@ if __name__ == '__main__':
             dis_feat, _ = model(img)
             query = torch.reshape(torch.from_numpy(torch.cat(dis_feat, 1).squeeze().cpu().numpy()), (1, 12, 340))
             MAN_NET.net.init_sequence_query(args.batch_size, query)
-            MAN_NET.net(indicator)
+
+            if False:            
+                MAN_NET.net(indicator)
+            else:
+                # Try padding the indicator to make it a sequence
+                padded_indicator = torch.concatenate((torch.zeros((6,151)), indicator))[None,...]
+                # Feed the sequence
+                for i in range(7):
+                    MAN_NET.net(padded_indicator[:,i,...])  # Quando chiamo net() -> chiamo il metodo forward
+
             net_memory = MAN_NET.net.get_memory()
             memory = net_memory.memory.numpy().reshape(4080)
 
